@@ -15,6 +15,7 @@
 
 /* Static methods for UV callbacks. */
 
+// See: https://luohaha.github.io/Chinese-uvbook/source/filesystem.html
 inline static void onAlloc(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buf)
 {
 	auto* socket = static_cast<UnixStreamSocket*>(handle->data);
@@ -22,6 +23,7 @@ inline static void onAlloc(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* 
 	if (socket == nullptr)
 		return;
 
+	// 为缓冲区分配内存
 	socket->OnUvReadAlloc(suggestedSize, buf);
 }
 
@@ -69,7 +71,7 @@ inline static void onShutdown(uv_shutdown_t* req, int /*status*/)
 
 /* Instance methods. */
 
-UnixStreamSocket::UnixStreamSocket(int fd, size_t bufferSize) : bufferSize(bufferSize)
+UnixStreamSocket::UnixStreamSocket(int fd, size_t bufferSize) : bufferSize(bufferSize)  // 初始化成员列表
 {
 	MS_TRACE_STD();
 
@@ -78,6 +80,8 @@ UnixStreamSocket::UnixStreamSocket(int fd, size_t bufferSize) : bufferSize(buffe
 	this->uvHandle       = new uv_pipe_t;
 	this->uvHandle->data = (void*)this;
 
+	// See https://libuv-docs-chinese.readthedocs.io/zh/latest/pipe.html
+	// 初始化一个管道句柄。 ipc 参数是一个布尔值指明是否管道将用于在不同进程间传递句柄。
 	err = uv_pipe_init(DepLibUV::GetLoop(), this->uvHandle, 0);
 
 	if (err != 0)
@@ -88,6 +92,7 @@ UnixStreamSocket::UnixStreamSocket(int fd, size_t bufferSize) : bufferSize(buffe
 		MS_THROW_ERROR_STD("uv_pipe_init() failed: %s", uv_strerror(err));
 	}
 
+    // 打开一个已存在的文件描述符或者句柄作为一个管道。
 	err = uv_pipe_open(this->uvHandle, fd);
 
 	if (err != 0)
@@ -98,6 +103,7 @@ UnixStreamSocket::UnixStreamSocket(int fd, size_t bufferSize) : bufferSize(buffe
 	}
 
 	// Start reading.
+	// 调用uv_read_start()后，我们开始监听stdin(主线程)，当需要新的缓冲区来存储数据时，调用 onAlloc，在函数 onRead 中定义缓冲区中的数据处理操作。
 	err = uv_read_start(
 	  reinterpret_cast<uv_stream_t*>(this->uvHandle),
 	  static_cast<uv_alloc_cb>(onAlloc),
@@ -226,10 +232,12 @@ inline void UnixStreamSocket::OnUvReadAlloc(size_t /*suggestedSize*/, uv_buf_t* 
 		return;
 
 	// If this is the first call to onUvReadAlloc() then allocate the receiving buffer now.
+	// 第一次调用初始化 buffer
 	if (this->buffer == nullptr)
 		this->buffer = new uint8_t[this->bufferSize];
 
 	// Tell UV to write after the last data byte in the buffer.
+	// 告诉UV在缓冲区中的最后一个数据字节后写入。
 	buf->base = reinterpret_cast<char*>(this->buffer + this->bufferDataLen);
 
 	// Give UV all the remaining space in the buffer.
@@ -262,6 +270,7 @@ inline void UnixStreamSocket::OnUvRead(ssize_t nread, const uv_buf_t* /*buf*/)
 		this->bufferDataLen += static_cast<size_t>(nread);
 
 		// Notify the subclass.
+		// 类成员函数相互调用，可以省略 this
 		UserOnUnixStreamRead();
 	}
 	// Peer disconneted.

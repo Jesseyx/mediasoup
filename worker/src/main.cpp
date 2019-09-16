@@ -29,6 +29,7 @@ void IgnoreSignals();
 
 int main(int argc, char* argv[])
 {
+     sleep(60); // 1 minute
 	// Ensure we are called by our Node library.
 	if (std::getenv("MEDIASOUP_VERSION") == nullptr)
 	{

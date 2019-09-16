@@ -23,6 +23,7 @@ namespace Channel
 	/* Instance methods. */
 
 	UnixStreamSocket::UnixStreamSocket(int fd)
+	    // 调用父类的构造函数
 	  : ::UnixStreamSocket::UnixStreamSocket(fd, NsMessageMaxLen)
 	{
 		MS_TRACE_STD();
